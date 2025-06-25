@@ -101,11 +101,12 @@ def root():
     return "Hello from Telegram bot!", 200
 
 # Устанавливаем Webhook перед первым запросом
-@app.before_first_request
 def init_webhook():
     telegram_app.bot.delete_webhook()
     telegram_app.bot.set_webhook(url=f"{APP_URL}/{TELEGRAM_TOKEN}")
+    logger.info(f"Webhook установлен на: {APP_URL}/{TELEGRAM_TOKEN}")
 
 # Запуск сервера
 if __name__ == "__main__":
+    init_webhook()  # Вызов функции явно
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
