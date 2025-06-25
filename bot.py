@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import uuid
 import logging
@@ -19,18 +18,15 @@ from firebase_admin import credentials, db
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Токены
+# Токены и переменные окружения
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
-APP_URL = os.environ.get('APP_URL')  # https://your-bot.onrender.com
+APP_URL = os.environ.get('APP_URL')
+firebase_key_json = os.environ.get('FIREBASE_CREDENTIALS')
 
-if not TELEGRAM_TOKEN or not APP_URL:
-    raise Exception("TELEGRAM_TOKEN и APP_URL должны быть заданы в переменных окружения")
+if not TELEGRAM_TOKEN or not APP_URL or not firebase_key_json:
+    raise Exception("Не заданы TELEGRAM_TOKEN, APP_URL или FIREBASE_CREDENTIALS")
 
 # Firebase
-firebase_key_json = os.environ.get('FIREBASE_CREDENTIALS')
-if not firebase_key_json:
-    raise Exception("FIREBASE_CREDENTIALS не установлена")
-
 cred_dict = json.loads(firebase_key_json)
 cred_dict['private_key'] = cred_dict['private_key'].replace('\\n', '\n')
 cred = credentials.Certificate(cred_dict)
@@ -46,7 +42,7 @@ app = Flask(__name__)
 # Telegram Application
 telegram_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-# Хендлеры
+# === Хендлеры ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Привет! Выберите подписку:\n"
@@ -86,48 +82,49 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("/start /confirm <month|year> /code /help")
 
-# Регистрируем хендлеры
+# Добавляем хендлеры
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("confirm", confirm_payment))
 telegram_app.add_handler(CommandHandler("code", get_code))
 telegram_app.add_handler(CommandHandler("help", help_command))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, choose_plan))
 
-
-
-# Flask endpoints
+# Webhook обработка
 @app.route("/webhook", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), telegram_app.bot)
 
-    async def process():
+    async def handle():
         try:
             await telegram_app.process_update(update)
         except Exception as e:
-            logger.exception(f"Ошибка при обработке обновления: {e}")
+            logger.exception(f"Ошибка при обработке update: {e}")
 
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(process())
+        loop.create_task(handle())
     except RuntimeError:
-        asyncio.run(process())
+        asyncio.new_event_loop().run_until_complete(handle())
 
     return "ok"
 
-
-
+# Проверка сервера
 @app.route("/", methods=["GET"])
 def root():
     return "Бот работает 🚀", 200
 
-# Основной запуск
-async def main():
-    await telegram_app.initialize()  # ✅ ОБЯЗАТЕЛЬНО!
-    await telegram_app.bot.delete_webhook()
+# Асинхронный запуск бота
+async def setup():
+    await telegram_app.initialize()
+await telegram_app.bot.delete_webhook()
     await telegram_app.bot.set_webhook(url=f"{APP_URL}/webhook")
     logger.info(f"Webhook установлен на: {APP_URL}/webhook")
 
+def main():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(setup())
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
