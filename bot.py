@@ -93,15 +93,28 @@ telegram_app.add_handler(CommandHandler("code", get_code))
 telegram_app.add_handler(CommandHandler("help", help_command))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, choose_plan))
 
+
+
 # Flask endpoints
 @app.route("/webhook", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), telegram_app.bot)
 
     async def process():
-        await telegram_app.process_update(update)
+        try:
+            await telegram_app.process_update(update)
+        except Exception as e:
+            logger.exception(f"Ошибка при обработке обновления: {e}")
 
-    return asyncio.run(process()) or "ok"
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(process())
+    except RuntimeError:
+        asyncio.run(process())
+
+    return "ok"
+
+
 
 @app.route("/", methods=["GET"])
 def root():
