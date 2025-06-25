@@ -15,15 +15,18 @@ from telegram.ext import (
 import firebase_admin
 from firebase_admin import credentials, db
 
-# Настройка логов
+# Логи
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Telegram токен и URL приложения
+# Токены
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 APP_URL = os.environ.get('APP_URL')  # https://your-app-name.onrender.com
 
-# Firebase credentials
+if not TELEGRAM_TOKEN or not APP_URL:
+    raise Exception("TELEGRAM_TOKEN и APP_URL должны быть заданы в переменных окружения")
+
+# Firebase
 firebase_key_json = os.environ.get('FIREBASE_CREDENTIALS')
 if not firebase_key_json:
     raise Exception("FIREBASE_CREDENTIALS не установлена")
@@ -40,7 +43,7 @@ root_ref = db.reference('/activation_codes')
 # Flask-приложение
 app = Flask(__name__)
 
-# Telegram App
+# Telegram Application
 telegram_app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 # Хендлеры
@@ -90,7 +93,7 @@ telegram_app.add_handler(CommandHandler("code", get_code))
 telegram_app.add_handler(CommandHandler("help", help_command))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, choose_plan))
 
-# Flask endpoint для webhook
+# Flask endpoint
 @app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), telegram_app.bot)
@@ -99,14 +102,16 @@ def webhook():
 
 @app.route("/", methods=["GET"])
 def root():
-    return "Hello from Telegram bot!", 200
+    return "Привет! Бот запущен 🚀", 200
 
-# Устанавливаем Webhook перед первым запросом
-async def init_webhook():
+# 👇 Асинхронный запуск
+async def main():
     await telegram_app.bot.delete_webhook()
     await telegram_app.bot.set_webhook(url=f"{APP_URL}/{TELEGRAM_TOKEN}")
     logger.info(f"Webhook установлен на: {APP_URL}/{TELEGRAM_TOKEN}")
 
-if __name__ == "__main__":
-    asyncio.run(init_webhook())  # ← правильно запускаем асинхронную функцию
+    # Запускаем Flask
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+if __name__ == "__main__":
+    asyncio.run(main())
