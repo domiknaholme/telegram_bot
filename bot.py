@@ -116,7 +116,7 @@ def root():
 # Асинхронный запуск бота
 async def setup():
     await telegram_app.initialize()
-await telegram_app.bot.delete_webhook()
+    await telegram_app.bot.delete_webhook()
     await telegram_app.bot.set_webhook(url=f"{APP_URL}/webhook")
     logger.info(f"Webhook установлен на: {APP_URL}/webhook")
 
