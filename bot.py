@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Токены
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
-APP_URL = os.environ.get('APP_URL')  # https://your-app-name.onrender.com
+APP_URL = os.environ.get('APP_URL')  # https://your-bot.onrender.com
 
 if not TELEGRAM_TOKEN or not APP_URL:
     raise Exception("TELEGRAM_TOKEN и APP_URL должны быть заданы в переменных окружения")
@@ -86,31 +86,35 @@ async def get_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("/start /confirm <month|year> /code /help")
 
-# Добавляем хендлеры
+# Регистрируем хендлеры
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("confirm", confirm_payment))
 telegram_app.add_handler(CommandHandler("code", get_code))
 telegram_app.add_handler(CommandHandler("help", help_command))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, choose_plan))
 
-# Flask endpoint БЕЗ токена
+# Flask endpoints
 @app.route("/webhook", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), telegram_app.bot)
-    asyncio.run(telegram_app.process_update(update))
-    return "ok"
+
+    async def process():
+        await telegram_app.process_update(update)
+
+    return asyncio.run(process()) or "ok"
 
 @app.route("/", methods=["GET"])
 def root():
-    return "Привет! Бот запущен 🚀", 200
+    return "Бот работает 🚀", 200
 
-# Установка Webhook (БЕЗ ТОКЕНА в URL)
+# Основной запуск
 async def main():
+    await telegram_app.initialize()  # ✅ ОБЯЗАТЕЛЬНО!
     await telegram_app.bot.delete_webhook()
     await telegram_app.bot.set_webhook(url=f"{APP_URL}/webhook")
     logger.info(f"Webhook установлен на: {APP_URL}/webhook")
 
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-    
+
 if __name__ == "__main__":
     asyncio.run(main())
