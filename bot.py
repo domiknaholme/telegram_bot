@@ -93,8 +93,8 @@ telegram_app.add_handler(CommandHandler("code", get_code))
 telegram_app.add_handler(CommandHandler("help", help_command))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, choose_plan))
 
-# Flask endpoint
-@app.route(f"/{TELEGRAM_TOKEN}", methods=["POST"])
+# Flask endpoint БЕЗ токена
+@app.route("/webhook", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), telegram_app.bot)
     asyncio.create_task(telegram_app.process_update(update))
@@ -104,14 +104,13 @@ def webhook():
 def root():
     return "Привет! Бот запущен 🚀", 200
 
-# 👇 Асинхронный запуск
+# Установка Webhook (БЕЗ ТОКЕНА в URL)
 async def main():
     await telegram_app.bot.delete_webhook()
-    await telegram_app.bot.set_webhook(url=f"{APP_URL}/{TELEGRAM_TOKEN}")
-    logger.info(f"Webhook установлен на: {APP_URL}/{TELEGRAM_TOKEN}")
+    await telegram_app.bot.set_webhook(url=f"{APP_URL}/webhook")
+    logger.info(f"Webhook установлен на: {APP_URL}/webhook")
 
-    # Запускаем Flask
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
-
+    
 if __name__ == "__main__":
     asyncio.run(main())
