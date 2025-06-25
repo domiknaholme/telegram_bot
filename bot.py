@@ -3,6 +3,7 @@ import sys
 import json
 import uuid
 import logging
+import asyncio
 
 from flask import Flask, request
 from telegram import Update
@@ -101,12 +102,11 @@ def root():
     return "Hello from Telegram bot!", 200
 
 # Устанавливаем Webhook перед первым запросом
-def init_webhook():
-    telegram_app.bot.delete_webhook()
-    telegram_app.bot.set_webhook(url=f"{APP_URL}/{TELEGRAM_TOKEN}")
+async def init_webhook():
+    await telegram_app.bot.delete_webhook()
+    await telegram_app.bot.set_webhook(url=f"{APP_URL}/{TELEGRAM_TOKEN}")
     logger.info(f"Webhook установлен на: {APP_URL}/{TELEGRAM_TOKEN}")
 
-# Запуск сервера
 if __name__ == "__main__":
-    init_webhook()  # Вызов функции явно
+    asyncio.run(init_webhook())  # ← правильно запускаем асинхронную функцию
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
